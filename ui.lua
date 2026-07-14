@@ -1,8 +1,3 @@
-does this perfectly match?
-
--- RetroUI – UI builder (Part 1)
--- All code up to CreateProgressBar
-
 local function rndName()
     local len = math.random(12, 22)
     local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -28,28 +23,95 @@ local CoreGui = getService("CoreGui")
 local RunService = getService("RunService")
 
 local function getGUIContainer()
-    if gethui then
-        local gui = gethui()
-        if gui then return gui end
+    -- Try each method in order, returning on first success.
+    local methods = {
+        -- 1. gethui (if available)
+        function()
+            if gethui then
+                local gui = gethui()
+                if gui then return gui end
+            end
+            return nil
+        end,
+        -- 2. syn.protect_gui (if available)
+        function()
+            if syn and syn.protect_gui then
+                local success, result = pcall(syn.protect_gui, Instance.new("ScreenGui"))
+                if success and result then return result end
+            end
+            return nil
+        end,
+        -- 3. CoreGui (with pcall)
+        function()
+            local success, container = pcall(function() return CoreGui end)
+            if success and container then
+                local gui = Instance.new("ScreenGui")
+                gui.Parent = container
+                return gui
+            end
+            return nil
+        end,
+        -- 4. PlayerGui (with robust waiting)
+        function()
+            local player = Players.LocalPlayer
+            if not player then
+                -- wait up to 5 seconds for LocalPlayer
+                for i = 1, 50 do
+                    player = Players.LocalPlayer
+                    if player then break end
+                    task.wait(0.1)
+                end
+            end
+            if player then
+                local playerGui = player:FindFirstChild("PlayerGui")
+                if not playerGui then
+                    -- wait up to 3 seconds for PlayerGui
+                    for i = 1, 30 do
+                        playerGui = player:FindFirstChild("PlayerGui")
+                        if playerGui then break end
+                        task.wait(0.1)
+                    end
+                end
+                if playerGui then
+                    local gui = Instance.new("ScreenGui")
+                    gui.Parent = playerGui
+                    return gui
+                else
+                    -- Try to parent directly to the player (some executors allow this)
+                    local success, gui = pcall(function()
+                        local g = Instance.new("ScreenGui")
+                        g.Parent = player
+                        return g
+                    end)
+                    if success and gui then
+                        return gui
+                    end
+                end
+            end
+            return nil
+        end,
+        -- 5. Absolute last resort: retry CoreGui (maybe it works now)
+        function()
+            local success, container = pcall(function() return CoreGui end)
+            if success and container then
+                local gui = Instance.new("ScreenGui")
+                gui.Parent = container
+                return gui
+            end
+            return nil
+        end
+    }
+
+    -- Iterate methods until one returns a valid ScreenGui
+    for _, method in ipairs(methods) do
+        local success, result = pcall(method)
+        if success and result and result:IsA("ScreenGui") then
+            return result
+        end
     end
-    if syn and syn.protect_gui then
-        local success, result = pcall(syn.protect_gui, Instance.new("ScreenGui"))
-        if success and result then return result end
-    end
-    local success, container = pcall(function() return CoreGui end)
-    if success and container then
-        local gui = Instance.new("ScreenGui")
-        gui.Parent = container
-        return gui
-    end
-    local player = Players.LocalPlayer
-    if player then
-        local playerGui = player:WaitForChild("PlayerGui")
-        local gui = Instance.new("ScreenGui")
-        gui.Parent = playerGui
-        return gui
-    end
-    error("No GUI container available")
+
+    -- If all fail, throw a clear error
+    error("No GUI container available after all fallbacks")
 end
 
 local GUI_CONTAINER = getGUIContainer()
@@ -824,14 +886,7 @@ function Tab:CreateProgressBar(text, max, default)
     }
 end
 
--- ============================================================
--- Part 2: Additional controls and window management
--- Append this code after Part 1.
--- ============================================================
-
--- ============================================================
 -- Global window registry
--- ============================================================
 local _windows = {}
 
 -- Override Window.new to auto-register
@@ -1177,16 +1232,9 @@ local RetroUI = {
     end,
 }
 
--- ============================================================
--- Part 3: Notifications, Dialogs, Input Dialogs, Save/Load
--- Append this code after Part 2.
--- ============================================================
-
 local HttpService = getService("HttpService")
 
--- ============================================================
 -- Notification System (toast messages)
--- ============================================================
 
 local NotificationContainer = nil
 
@@ -1540,14 +1588,7 @@ RetroUI.InputDialog = RetroUI.InputDialog
 RetroUI.SaveSettings = RetroUI.SaveSettings
 RetroUI.LoadSettings = RetroUI.LoadSettings
 
--- ============================================================
--- Part 4: Advanced controls and finalization
--- Append this code after Part 3.
--- ============================================================
-
--- ============================================================
 -- Advanced Color Picker (HSV sliders)
--- ============================================================
 function Tab:CreateColorPickerAdvanced(text, defaultColor, callback)
     local frame = self.frame
     local y = self._y
