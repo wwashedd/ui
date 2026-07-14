@@ -23,95 +23,116 @@ local CoreGui = getService("CoreGui")
 local RunService = getService("RunService")
 
 local function getGUIContainer()
-    -- Try each method in order, returning on first success.
-    local methods = {
-        -- 1. gethui (if available)
-        function()
-            if gethui then
-                local gui = gethui()
-                if gui then return gui end
-            end
-            return nil
-        end,
-        -- 2. syn.protect_gui (if available)
-        function()
-            if syn and syn.protect_gui then
-                local success, result = pcall(syn.protect_gui, Instance.new("ScreenGui"))
-                if success and result then return result end
-            end
-            return nil
-        end,
-        -- 3. CoreGui (with pcall)
-        function()
-            local success, container = pcall(function() return CoreGui end)
-            if success and container then
-                local gui = Instance.new("ScreenGui")
-                gui.Parent = container
-                return gui
-            end
-            return nil
-        end,
-        -- 4. PlayerGui (with robust waiting)
-        function()
-            local player = Players.LocalPlayer
-            if not player then
-                -- wait up to 5 seconds for LocalPlayer
-                for i = 1, 50 do
-                    player = Players.LocalPlayer
-                    if player then break end
-                    task.wait(0.1)
-                end
-            end
-            if player then
-                local playerGui = player:FindFirstChild("PlayerGui")
-                if not playerGui then
-                    -- wait up to 3 seconds for PlayerGui
-                    for i = 1, 30 do
-                        playerGui = player:FindFirstChild("PlayerGui")
-                        if playerGui then break end
-                        task.wait(0.1)
-                    end
-                end
-                if playerGui then
-                    local gui = Instance.new("ScreenGui")
-                    gui.Parent = playerGui
-                    return gui
-                else
-                    -- Try to parent directly to the player (some executors allow this)
-                    local success, gui = pcall(function()
-                        local g = Instance.new("ScreenGui")
-                        g.Parent = player
-                        return g
-                    end)
-                    if success and gui then
-                        return gui
-                    end
-                end
-            end
-            return nil
-        end,
-        -- 5. Absolute last resort: retry CoreGui (maybe it works now)
-        function()
-            local success, container = pcall(function() return CoreGui end)
-            if success and container then
-                local gui = Instance.new("ScreenGui")
-                gui.Parent = container
-                return gui
-            end
-            return nil
-        end
-    }
+    local failures = {} -- collects error messages from each method
 
-    -- Iterate methods until one returns a valid ScreenGui
-    for _, method in ipairs(methods) do
-        local success, result = pcall(method)
-        if success and result and result:IsA("ScreenGui") then
-            return result
+    -- 1. gethui (most common in executors)
+    local function tryGethui()
+        if gethui then
+            local gui = gethui()
+            if gui then return gui end
+        end
+        return nil, "gethui returned nil or not available"
+    end
+
+    -- 2. syn.protect_gui (Synapse-style)
+    local function trySyn()
+        if syn and syn.protect_gui then
+            local success, result = pcall(syn.protect_gui, Instance.new("ScreenGui"))
+            if success and result then
+                return result
+            end
+            return nil, (not success and "syn.protect_gui pcall failed" or "result invalid")
+        end
+        return nil, "syn not available"
+    end
+
+    -- 3. CoreGui (normal Roblox)
+    local function tryCoreGui()
+        local success, container = pcall(function() return CoreGui end)
+        if success and container then
+            local gui = Instance.new("ScreenGui")
+            gui.Parent = container
+            return gui
+        end
+        return nil, (not success and "CoreGui pcall failed" or "CoreGui missing")
+    end
+
+    -- 4. PlayerGui (fallback with robust waiting)
+    local function tryPlayerGui()
+        local player = Players.LocalPlayer
+        if not player then
+            -- wait up to 5 seconds for LocalPlayer
+            for i = 1, 50 do
+                player = Players.LocalPlayer
+                if player then break end
+                task.wait(0.1)
+            end
+        end
+        if not player then
+            return nil, "LocalPlayer still nil after waiting"
+        end
+
+        local playerGui = player:FindFirstChild("PlayerGui")
+        if not playerGui then
+            -- wait up to 3 seconds for PlayerGui
+            for i = 1, 30 do
+                playerGui = player:FindFirstChild("PlayerGui")
+                if playerGui then break end
+                task.wait(0.1)
+            end
+        end
+
+        if playerGui then
+            local gui = Instance.new("ScreenGui")
+            gui.Parent = playerGui
+            return gui
+        else
+            -- last attempt: parent directly to player (some executors allow this)
+            local success, gui = pcall(function()
+                local g = Instance.new("ScreenGui")
+                g.Parent = player
+                return g
+            end)
+            if success and gui then
+                return gui
+            end
+            return nil, "PlayerGui missing and direct player parenting failed"
         end
     end
 
-    -- If all fail, throw a clear error
-    error("No GUI container available after all fallbacks")
+    -- 5. CoreGui retry (sometimes works after timing)
+    local function tryCoreGuiRetry()
+        return tryCoreGui() -- same as method 3, but we'll report it as retry
+    end
+
+    -- List of attempts with names
+    local attempts = {
+        { name = "gethui", func = tryGethui },
+        { name = "syn.protect_gui", func = trySyn },
+        { name = "CoreGui (1st try)", func = tryCoreGui },
+        { name = "PlayerGui", func = tryPlayerGui },
+        { name = "CoreGui (retry)", func = tryCoreGuiRetry },
+    }
+
+    for _, attempt in ipairs(attempts) do
+        local success, result = pcall(attempt.func)
+        if success and result and result:IsA("ScreenGui") then
+            return result
+        end
+        -- collect failure reason if available
+        if not success then
+            table.insert(failures, string.format("%s: pcall error – %s", attempt.name, tostring(result)))
+        elseif not result then
+            table.insert(failures, string.format("%s: returned nil", attempt.name))
+        elseif not result:IsA("ScreenGui") then
+            table.insert(failures, string.format("%s: returned non-ScreenGui (%s)", attempt.name, typeof(result)))
+        end
+    end
+
+    -- If all failed, throw a detailed error
+    local errorMsg = "No GUI container available after all fallbacks.\nAttempted methods:\n"
+    errorMsg = errorMsg .. table.concat(failures, "\n")
+    error(errorMsg)
 end
 
 local GUI_CONTAINER = getGUIContainer()
