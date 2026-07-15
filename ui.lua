@@ -5056,5 +5056,4 @@ if not safeInit() then
     warn("[RetroUI] GUI container not ready, some features may not work.")
 end
 
-getgenv().RetroUI = RetroUI
 return RetroUI
