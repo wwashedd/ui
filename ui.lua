@@ -535,6 +535,29 @@ end
 
 local GUI_CONTAINER = getGUIContainer()
 
+local RetroUI = {
+    Version = "1.0.0",
+    ExecutorInfo = Executor,
+    IsWeak = function() return Executor.isWeak end,
+    GetContainer = function() return GUI_CONTAINER end,
+    SetBorderColor = function(color) Theme.BorderColor = color end,
+    GetBorderColor = function() return Theme.BorderColor end,
+    SetTheme = function(newTheme) Theme = tableMerge(Theme, newTheme) end,
+    GetTheme = function() return deepClone(Theme) end,
+    ApplyTheme = applyThemeToInstance,
+    CreateWindow = function(title, size) return Window.new(title, size) end,
+}
+
+local function getNotificationContainer()
+    local container = Instance.new("Frame")
+    container.Name = rndName()
+    container.BackgroundTransparency = 1
+    container.Size = UDim2.new(0, 300, 1, 0)
+    container.Position = UDim2.new(1, -310, 0, 0)
+    container.Parent = GUI_CONTAINER
+    return container
+end
+
 local function addBorder(obj, thickness)
     thickness = thickness or 1
     local supported = false
@@ -704,19 +727,6 @@ local function applyThemeToInstance(obj)
         applyThemeToInstance(child)
     end
 end
-
-local RetroUI = {
-    Version = "1.0.0",
-    ExecutorInfo = Executor,
-    IsWeak = function() return Executor.isWeak end,
-    GetContainer = function() return GUI_CONTAINER end,
-    SetBorderColor = function(color) Theme.BorderColor = color end,
-    GetBorderColor = function() return Theme.BorderColor end,
-    SetTheme = function(newTheme) Theme = tableMerge(Theme, newTheme) end,
-    GetTheme = function() return deepClone(Theme) end,
-    ApplyTheme = applyThemeToInstance,
-    CreateWindow = function(title, size) return Window.new(title, size) end,
-}
 
 local Window = {}
 Window.__index = Window
@@ -3434,11 +3444,13 @@ RunService.Heartbeat:Connect(function(dt)
     gcTimer = gcTimer + dt
     if gcTimer > 60 then
         gcTimer = 0
-if collectgarbage then
-    pcall(function()
-        collectgarbage("collect")
-    end)
-end
+        if collectgarbage then
+            pcall(function()
+                collectgarbage("collect")
+            end)
+        end
+    end
+end)
 
 -- Throttle UI updates
 local renderThrottle = 0
