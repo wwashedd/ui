@@ -4293,11 +4293,13 @@ RunService.Heartbeat:Connect(function(dt)
     gcTimer = gcTimer + dt
     if gcTimer > 60 then
         gcTimer = 0
-if collectgarbage then
-    pcall(function()
-        collectgarbage("collect")
-    end)
-end
+        if collectgarbage then
+            pcall(function()
+                collectgarbage("collect")
+            end)
+        end
+    end
+end)
 
 -- Throttle UI updates
 local renderThrottle = 0
@@ -4683,10 +4685,6 @@ local function playUISound(soundId)
 end
 
 RetroUI.PlayUISound = playUISound
-
--- ============================================================
--- RETRO UI – PART 6/6: Finalization, Utilities, & API Completion
--- ============================================================
 
 local function getControlByPath(window, path)
     -- path: "tabName.controlIndex" or "tabName.controlName"
