@@ -4838,9 +4838,7 @@ function RetroUI.ImportLayout(window, layout)
     -- not implemented
 end
 
--- ============================================================
 -- ADDITIONAL UTILITY FUNCTIONS
--- ============================================================
 
 function RetroUI.GetVersion()
     return "1.0.0"
@@ -4975,10 +4973,6 @@ end
 function RetroUI.GetActiveWindow()
     return getActiveWindow()
 end
-
--- ============================================================
--- ENHANCED NOTIFICATIONS WITH POSITIONING
--- ============================================================
 
 function RetroUI.NotifyAtPosition(title, message, position, duration)
     duration = duration or 3
