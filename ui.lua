@@ -3435,12 +3435,11 @@ RunService.Heartbeat:Connect(function(dt)
     if gcTimer > 60 then
         gcTimer = 0
 if collectgarbage then
-    pcall(collectgarbage, "step", 10)
+    pcall(function()
+        collectgarbage("collect")
+    end)
 end
-    end
-end)
 
--- Throttle UI updates
 -- Throttle UI updates
 local renderThrottle = 0
 local function throttledUpdate(dt)
@@ -4282,11 +4281,11 @@ RunService.Heartbeat:Connect(function(dt)
     gcTimer = gcTimer + dt
     if gcTimer > 60 then
         gcTimer = 0
-        if collectgarbage then
-            collectgarbage("step", 10)
-        end
-    end
-end)
+if collectgarbage then
+    pcall(function()
+        collectgarbage("collect")
+    end)
+end
 
 -- Throttle UI updates
 local renderThrottle = 0
